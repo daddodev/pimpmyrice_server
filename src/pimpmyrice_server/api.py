@@ -163,9 +163,12 @@ def send_to_server(
 ) -> None:
     if "IMAGE" in args and args["IMAGE"]:
         args["IMAGE"] = [
-            str(Path(img).absolute())
+            (
+                img
+                if img.startswith(("http://", "https://"))
+                else str(Path(img).absolute())
+            )
             for img in args["IMAGE"]
-            if not img.startswith(("http://", "https://"))
         ]
 
     log.debug(f"connecting to {address}")
