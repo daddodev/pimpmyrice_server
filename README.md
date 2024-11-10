@@ -2,6 +2,8 @@
 
 _Work in progress._
 
+Server for [PimpMyRice](https://github.com/daddodev/PimpMyRice)
+
 ## Quick start
 
 ### Install
