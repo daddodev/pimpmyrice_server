@@ -5,9 +5,9 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Awaitable
 
-from pimpmyrice.config import (ALBUMS_DIR, BASE_STYLE_FILE, CONFIG_FILE,
-                               LOG_FILE, MODULES_DIR, PALETTES_DIR,
-                               PIMP_CONFIG_DIR, STYLES_DIR, TEMP_DIR)
+from pimpmyrice.config import (BASE_STYLE_FILE, CONFIG_FILE, LOG_FILE,
+                               MODULES_DIR, PALETTES_DIR, PIMP_CONFIG_DIR,
+                               STYLES_DIR, TEMP_DIR, THEMES_DIR)
 from pimpmyrice.keywords import base_style
 from pimpmyrice.logger import get_logger
 from pimpmyrice.utils import Result
@@ -45,40 +45,17 @@ class ConfigDirWatchdog(FileSystemEventHandler):
             self.tm.base_style = self.tm.get_base_style()
             self.run_async(self.tm.apply_theme())
 
-        elif path.parent == ALBUMS_DIR and event.is_directory:
-            album_name = path.name
-            if event.event_type == "created":
-                self.tm.albums[album_name] = {}
-                log.info(f'album "{album_name}" created')
-            elif event.event_type == "deleted":
-                self.tm.albums.pop(album_name)
-                log.info(f'album "{album_name}" deleted')
-            elif hasattr(event, "dest_path"):
-                new_album_name = Path(event.dest_path).name
-                self.tm.albums[new_album_name] = self.tm.get_themes(
-                    Path(event.dest_path)
-                )
-                self.tm.albums.pop(album_name)
-                log.info(f'album "{album_name}" renamed to "{new_album_name}"')
-
-                if self.tm.config.album == album_name:
-                    self.tm.config.album = new_album_name
-
-        elif path.name == "theme.json" and path.parents[2] == ALBUMS_DIR:
+        elif path.name == "theme.json" and path.parents[1] == THEMES_DIR:
             theme_name = path.parent.name
-            album_name = path.parents[1].name
             if event.event_type == "modified":
-                self.tm.albums[album_name][theme_name] = self.tm.get_theme(path.parent)
-                log.info(f'theme "{theme_name}" in album {album_name} loaded')
+                self.tm.themes[theme_name] = self.tm.get_theme(path.parent)
+                log.info(f'theme "{theme_name}" loaded')
 
-                if (
-                    self.tm.config.theme == theme_name
-                    and self.tm.config.album == album_name
-                ):
+                if self.tm.config.theme == theme_name:
                     self.run_async(self.tm.apply_theme())
             elif event.event_type == "deleted":
-                self.tm.albums[album_name].pop(theme_name)
-                log.info(f'theme "{theme_name}" in album {album_name} deleted')
+                self.tm.themes.pop(theme_name)
+                log.info(f'theme "{theme_name}" deleted')
 
         elif path.name == "module.yaml" and path.parents[1] == MODULES_DIR:
             module_name = path.parent.name

@@ -66,16 +66,16 @@ async def run_server() -> None:
         except WebSocketDisconnect:
             manager.disconnect(websocket)
 
-    @v1_router.get("/albums")
-    async def get_albums() -> list[str]:
-        albums = [a for a in tm.albums.keys()]
-        return albums
+    @v1_router.get("/tags")
+    async def get_tags() -> list[str]:
+        tags = [t for t in tm.tags]
+        return tags
 
     @v1_router.get("/current_theme")
     async def get_current_theme() -> dict[str, Any] | None:
         if not tm.config.theme:
             return None
-        theme = tm.albums[tm.config.album][tm.config.theme]
+        theme = tm.themes[tm.config.theme]
         dump = dump_theme(theme, for_api=True)
 
         msg = {"config": vars(tm.config), "theme": dump}
@@ -83,13 +83,11 @@ async def run_server() -> None:
         return msg
 
     @v1_router.put("/current_theme")
-    async def set_theme(
-        name: str | None = None, album: str | None = None, random: str | None = None
-    ) -> str:
+    async def set_theme(name: str | None = None, random: str | None = None) -> str:
         if random is None:
-            res = await tm.apply_theme(theme_name=name, album=album)
+            res = await tm.apply_theme(theme_name=name)
         else:
-            res = await tm.set_random_theme(theme_name_includes=name, album=album)
+            res = await tm.set_random_theme(name_includes=name)
 
         msg = {
             "event": "theme_applied",
@@ -102,29 +100,24 @@ async def run_server() -> None:
         return json_str
 
     @v1_router.get("/theme/{name}")
-    async def get_theme(
-        request: Request, name: str, album: str | None = None
-    ) -> dict[str, Any]:
+    async def get_theme(request: Request, name: str) -> dict[str, Any]:
         client_host = request.client.host if request.client else "127.0.0.1"
 
         if client_host != "127.0.0.1":
             log.error("streaming images not yet implemented")
 
-        res = {"theme": dump_theme(tm.albums[album or "default"][name], for_api=True)}
+        res = {"theme": dump_theme(tm.themes[name], for_api=True)}
         return res
 
     @v1_router.get("/themes")
-    async def get_themes(request: Request, album: str | None = None) -> dict[str, Any]:
+    async def get_themes(request: Request) -> dict[str, Any]:
         client_host = request.client.host if request.client else "127.0.0.1"
 
         if client_host != "127.0.0.1":
             log.error("streaming images not yet implemented")
 
         res = {
-            "themes": [
-                dump_theme(theme, for_api=True)
-                for theme in tm.albums[album or "default"].values()
-            ]
+            "themes": [dump_theme(theme, for_api=True) for theme in tm.themes.values()]
         }
         return res
 
