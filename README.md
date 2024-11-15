@@ -17,7 +17,7 @@ pipx install git+https://github.com/daddodev/pimpmyrice_server.git
 ### Start server
 
 ```bash
-pimp_server start
+pimp-server start
 ```
 
 ## [Documentation](https://pimpmyrice.vercel.app/docs)

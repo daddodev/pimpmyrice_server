@@ -1,13 +1,13 @@
 """
+See https://pimpmyrice.vercel.app/docs for more info.
+
 Usage:
-    pimp_server start [options]
-    pimp_server stop [options]
-    pimp_server info [options]
+    pimp-server start [options]
+    pimp-server stop [options]
+    pimp-server info [options]
 
 Options:
     --verbose -v
-
-See https://pimpmyrice.vercel.app/docs for more info.
 """
 
 import logging
@@ -16,7 +16,6 @@ import signal
 
 from docopt import DocoptExit, docopt  # type:ignore
 from pimpmyrice.config import SERVER_PID_FILE
-from pimpmyrice.files import check_config_dirs
 from pimpmyrice.logger import get_logger
 from pimpmyrice.utils import is_locked
 
@@ -26,9 +25,6 @@ log = get_logger(__name__)
 
 
 async def cli() -> None:
-    # TODO move to pimp.init
-    check_config_dirs()
-
     try:
         args = docopt(__doc__)
     except DocoptExit:
