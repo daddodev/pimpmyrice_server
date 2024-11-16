@@ -1,10 +1,12 @@
 import os
 import signal
+from importlib import resources
 from threading import Thread
 
-import pkg_resources
 from PIL import Image
 from pystray import Icon, Menu, MenuItem
+
+from . import assets
 
 
 def stop_server() -> None:
@@ -14,7 +16,10 @@ def stop_server() -> None:
 def start_tray_icon() -> Icon:
     menu = Menu(MenuItem("stop server", stop_server))
 
-    icon_path = pkg_resources.resource_filename(__name__, "assets/pimp.ico")
+    icon_t = resources.files(assets) / "pimp.ico"
+    with resources.as_file(icon_t) as f:
+        icon_path = f
+
     icon = Icon(
         name="PimpMyRice server",
         title="PimpMyRice server",
