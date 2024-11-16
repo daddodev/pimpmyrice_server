@@ -2,7 +2,7 @@
 
 _Work in progress._
 
-Server for [PimpMyRice](https://github.com/daddodev/PimpMyRice)
+Server for [PimpMyRice](https://github.com/daddodev/pimpmyrice)
 
 ## Quick start
 
@@ -11,7 +11,7 @@ Server for [PimpMyRice](https://github.com/daddodev/PimpMyRice)
 #### [Pipx](https://pipx.pypa.io/stable/installation/)
 
 ```bash
-pipx install git+https://github.com/daddodev/pimpmyrice_server.git
+pipx install pimpmyrice_server
 ```
 
 ### Start server
