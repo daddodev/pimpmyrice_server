@@ -13,6 +13,7 @@ Options:
 import logging
 import os
 import signal
+from importlib.metadata import version
 
 from docopt import DocoptExit, docopt  # type:ignore
 from pimpmyrice.config import SERVER_PID_FILE
@@ -36,7 +37,9 @@ async def cli() -> None:
 
     server_running, server_pid = is_locked(SERVER_PID_FILE)
 
-    if args["start"]:
+    if args["info"]:
+        print(f'🍙 PimpMyRice server {version("pimpmyrice_server")}')
+    elif args["start"]:
         if server_running:
             log.error("server already running")
         else:
