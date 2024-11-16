@@ -21,6 +21,7 @@ from pimpmyrice.logger import get_logger
 from pimpmyrice.utils import is_locked
 
 from .api import run_server
+from .tray import start_tray_icon
 
 log = get_logger(__name__)
 
@@ -39,11 +40,16 @@ async def cli() -> None:
 
     if args["info"]:
         print(f'🍙 PimpMyRice server {version("pimpmyrice_server")}')
+
     elif args["start"]:
         if server_running:
             log.error("server already running")
         else:
+            icon = start_tray_icon()
+
             await run_server()
+
+            icon.stop()
 
     elif args["stop"]:
         if server_running:

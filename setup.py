@@ -23,6 +23,10 @@ setuptools.setup(
     entry_points={"console_scripts": ["pimp-server=pimpmyrice_server.__main__:main"]},
     package_dir={"": "src"},
     packages=setuptools.find_packages(where="src"),
+    include_package_data=True,
+    package_data={
+        "pimpmyrice_server": ["assets/pimp.ico"],
+    },
     python_requires=">=3.12",
     install_requires=[
         "pimpmyrice",
@@ -31,5 +35,6 @@ setuptools.setup(
         "docopt",
         "requests",
         "watchdog",
+        "pystray",
     ],
 )
