@@ -9,6 +9,7 @@ from pimpmyrice.config import (BASE_STYLE_FILE, CONFIG_FILE, LOG_FILE,
                                MODULES_DIR, PALETTES_DIR, PIMP_CONFIG_DIR,
                                STYLES_DIR, TEMP_DIR, THEMES_DIR)
 from pimpmyrice.logger import get_logger
+from pimpmyrice.parsers import parse_theme
 from pimpmyrice.utils import Result
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
@@ -47,7 +48,7 @@ class ConfigDirWatchdog(FileSystemEventHandler):
         elif path.name == "theme.json" and path.parents[1] == THEMES_DIR:
             theme_name = path.parent.name
             if event.event_type == "modified":
-                self.tm.themes[theme_name] = self.tm.get_theme(path.parent)
+                self.tm.themes[theme_name] = self.tm.parse_theme(path.parent)
                 log.info(f'theme "{theme_name}" loaded')
 
                 if self.tm.config.theme == theme_name:
