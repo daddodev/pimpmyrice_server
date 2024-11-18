@@ -108,11 +108,6 @@ async def run_server() -> None:
 
     @v1_router.get("/theme/{name}")
     async def get_theme(request: Request, name: str) -> dict[str, Any]:
-        client_host = request.client.host if request.client else "127.0.0.1"
-
-        if client_host != "127.0.0.1":
-            log.error("streaming images not yet implemented")
-
         res = {"theme": dump_theme(tm.themes[name], for_api=True)}
         return res
 
