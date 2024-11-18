@@ -36,5 +36,6 @@ setuptools.setup(
         "requests",
         "watchdog",
         "pystray",
+        "psutil",
     ],
 )

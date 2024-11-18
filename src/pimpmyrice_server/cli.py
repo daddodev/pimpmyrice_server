@@ -21,7 +21,7 @@ from pimpmyrice.logger import get_logger
 from pimpmyrice.utils import is_locked
 
 from .api import run_server
-from .tray import start_tray_icon
+from .tray import TrayIcon
 
 log = get_logger(__name__)
 
@@ -45,11 +45,8 @@ async def cli() -> None:
         if server_running:
             log.error("server already running")
         else:
-            icon = start_tray_icon()
-
-            await run_server()
-
-            icon.stop()
+            with TrayIcon():
+                await run_server()
 
     elif args["stop"]:
         if server_running:
