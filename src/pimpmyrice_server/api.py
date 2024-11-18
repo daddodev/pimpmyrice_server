@@ -5,6 +5,7 @@ from typing import Any
 import requests
 import uvicorn
 from fastapi import APIRouter, FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse
 from fastapi.routing import APIRoute
 from pimpmyrice.args import process_args
 from pimpmyrice.config import SERVER_PID_FILE
@@ -32,7 +33,9 @@ class ConnectionManager:
     async def send_personal_message(self, message: str, websocket: WebSocket) -> None:
         await websocket.send_text(message)
 
-    async def broadcast(self, message: str) -> None:
+    async def broadcast(self, message: str | dict[str, Any]) -> None:
+        if isinstance(message, dict):
+            message = json.dumps(message)
         for connection in self.active_connections:
             await connection.send_text(message)
 
@@ -47,10 +50,14 @@ async def run_server() -> None:
     manager = ConnectionManager()
     v1_router = APIRouter()
 
+    async def broadcast_config() -> None:
+        await manager.broadcast(
+            json.dumps({"type": "config_changed", "config": vars(tm.config)})
+        )
+
     tm.event_handler.subscribe(
         "theme_applied",
-        manager.broadcast,
-        json.dumps({"type": "config_changed", "config": vars(tm.config)}),
+        broadcast_config,
     )
 
     @v1_router.websocket("/ws/{client_id}")
@@ -111,15 +118,20 @@ async def run_server() -> None:
 
     @v1_router.get("/themes")
     async def get_themes(request: Request) -> dict[str, Any]:
-        client_host = request.client.host if request.client else "127.0.0.1"
-
-        if client_host != "127.0.0.1":
-            log.error("streaming images not yet implemented")
-
         res = {
             "themes": [dump_theme(theme, for_api=True) for theme in tm.themes.values()]
         }
+
         return res
+
+    @v1_router.get("/image")
+    async def get_image(request: Request, path: str) -> FileResponse:
+        file_path = Path(path)
+
+        if not file_path.is_file():
+            raise FileNotFoundError(path)
+
+        return FileResponse(file_path)
 
     @v1_router.get("/base_style")
     async def get_base_style(request: Request) -> dict[str, Any]:
@@ -144,7 +156,7 @@ async def run_server() -> None:
 
     app.include_router(v1_router, prefix="/v1")
 
-    config = uvicorn.Config(app, port=5000)
+    config = uvicorn.Config(app, port=5000, host="*")
     server = uvicorn.Server(config)
 
     with Lock(SERVER_PID_FILE), ConfigDirWatchdog(tm):
