@@ -11,7 +11,7 @@ from pimpmyrice.args import process_args
 from pimpmyrice.config import SERVER_PID_FILE
 from pimpmyrice.logger import LogLevel, get_logger
 from pimpmyrice.theme import ThemeManager
-from pimpmyrice.theme_utils import dump_theme
+from pimpmyrice.theme_utils import Theme, ThemeConfig
 from pimpmyrice.utils import Lock
 
 from .files import ConfigDirWatchdog
@@ -79,15 +79,17 @@ async def run_server() -> None:
         return tags
 
     @v1_router.get("/current_theme")
-    async def get_current_theme() -> dict[str, Any] | None:
+    async def get_current_theme() -> Theme | None:
         if not tm.config.theme:
             return None
         theme = tm.themes[tm.config.theme]
-        dump = dump_theme(theme, for_api=True)
+        return theme
 
-        msg = {"config": vars(tm.config), "theme": dump}
-
-        return msg
+        # dump = dump_theme(theme, for_api=True)
+        #
+        # msg = {"config": vars(tm.config), "theme": dump}
+        #
+        # return msg
 
     @v1_router.put("/current_theme")
     async def set_theme(name: str | None = None, random: str | None = None) -> str:
@@ -107,17 +109,15 @@ async def run_server() -> None:
         return json_str
 
     @v1_router.get("/theme/{name}")
-    async def get_theme(request: Request, name: str) -> dict[str, Any]:
-        res = {"theme": dump_theme(tm.themes[name], for_api=True)}
-        return res
+    async def get_theme(request: Request, name: str) -> Theme:
+        theme = tm.themes[name]
+        return theme
 
     @v1_router.get("/themes")
-    async def get_themes(request: Request) -> dict[str, Any]:
-        res = {
-            "themes": [dump_theme(theme, for_api=True) for theme in tm.themes.values()]
-        }
+    async def get_themes(request: Request) -> dict[str, Theme]:
+        themes = tm.themes
 
-        return res
+        return themes
 
     @v1_router.get("/image")
     async def get_image(request: Request, path: str) -> FileResponse:
@@ -130,8 +130,8 @@ async def run_server() -> None:
 
     @v1_router.get("/base_style")
     async def get_base_style(request: Request) -> dict[str, Any]:
-        res = {"keywords": tm.base_style}
-        return res
+        keywords = tm.base_style
+        return keywords
 
     @v1_router.post("/cli_command")
     async def cli_command(req: Request) -> str:
