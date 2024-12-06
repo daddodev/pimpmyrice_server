@@ -171,6 +171,9 @@ def send_to_server(
             for img in args["IMAGE"]
         ]
 
+    if args["OUT_DIR"]:
+        args["OUT_DIR"] = str(Path(args["OUT_DIR"]).absolute())
+
     log.debug(f"connecting to {address}")
 
     try:
