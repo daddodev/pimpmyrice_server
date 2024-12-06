@@ -2,7 +2,7 @@
 See https://pimpmyrice.vercel.app/docs for more info.
 
 Usage:
-    pimp-server start [options]
+    pimp-server start [--daemon] [options]
     pimp-server stop [options]
     pimp-server info [options]
 
@@ -10,14 +10,19 @@ Options:
     --verbose -v
 """
 
+import asyncio
 import logging
 import os
 import signal
+import subprocess
+import sys
 from importlib.metadata import version
+from multiprocessing import Process
 
 from docopt import DocoptExit, docopt  # type:ignore
 from pimpmyrice.config import SERVER_PID_FILE
 from pimpmyrice.logger import get_logger
+from pimpmyrice.module_utils import run_shell_command_detached
 from pimpmyrice.utils import is_locked
 
 from .api import run_server
@@ -39,11 +44,38 @@ async def cli() -> None:
     server_running, server_pid = is_locked(SERVER_PID_FILE)
 
     if args["info"]:
-        print(f'🍙 PimpMyRice server {version("pimpmyrice_server")}')
+        log.info(f'🍙 PimpMyRice server {version("pimpmyrice_server")}')
+
+    # TODO
+    # elif args["attach"]:
 
     elif args["start"]:
         if server_running:
             log.error("server already running")
+
+        elif args["--daemon"]:
+            log.debug("starting server daemon")
+
+            run_shell_command_detached(f"pimp-server start {' '.join(sys.argv)}")
+
+            if sys.platform == "win32":
+                # Relaunch using CREATE_NEW_PROCESS_GROUP to fully detach
+                subprocess.Popen(
+                    [sys.executable] + sys.argv,
+                    creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+                )
+            else:
+                # On Unix-like systems, fork and detach
+                sys.argv.remove("--daemon")
+                subprocess.Popen(
+                    [sys.executable] + sys.argv,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    preexec_fn=os.setpgrp,
+                )
+
+            log.info("server started in the background")
+
         else:
             with TrayIcon():
                 await run_server()
