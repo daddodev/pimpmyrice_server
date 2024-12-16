@@ -38,4 +38,13 @@ setuptools.setup(
         "pystray",
         "psutil",
     ],
+    extras_require={
+        "dev": [
+            "mypy",
+            "black",
+            "types-requests",
+            "types-PyYAML",
+            "isort",
+        ],
+    },
 )
