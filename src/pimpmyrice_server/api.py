@@ -1,11 +1,12 @@
+import asyncio
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, AsyncGenerator
 
 import requests
 import uvicorn
 from fastapi import APIRouter, FastAPI, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.routing import APIRoute
 from pimpmyrice.args import process_args
 from pimpmyrice.config import SERVER_PID_FILE
@@ -85,12 +86,6 @@ async def run_server() -> None:
         theme = tm.themes[tm.config.theme]
         return theme
 
-        # dump = dump_theme(theme, for_api=True)
-        #
-        # msg = {"config": vars(tm.config), "theme": dump}
-        #
-        # return msg
-
     @v1_router.put("/current_theme")
     async def set_theme(name: str | None = None, random: str | None = None) -> str:
         if random is None:
@@ -134,7 +129,7 @@ async def run_server() -> None:
         return keywords
 
     @v1_router.post("/cli_command")
-    async def cli_command(req: Request) -> str:
+    async def cli_command(req: Request) -> StreamingResponse:
         req_json = await req.json()
 
         result = await process_args(tm, req_json)
@@ -145,9 +140,26 @@ async def run_server() -> None:
             "result": result.dump(),
         }
 
-        json_str = json.dumps(msg)
+        # TO DO
 
-        return json_str
+        async def content() -> AsyncGenerator[str, None]:
+            for i, record in enumerate(result.records):
+                yield json.dumps({"chunk": i, "data": record.dump()}) + "\n"
+                # await asyncio.sleep(0.1)
+
+        stream = StreamingResponse(
+            content(),
+            status_code=200,
+            headers=None,
+            media_type=None,
+            background=None,
+        )
+
+        return stream
+
+        # json_str = json.dumps(msg)
+
+        # return json_str
 
     app.include_router(v1_router, prefix="/v1")
 
@@ -156,34 +168,3 @@ async def run_server() -> None:
 
     with Lock(SERVER_PID_FILE), ConfigDirWatchdog(tm):
         await server.serve()
-
-
-def send_to_server(
-    args: dict[str, Any], address: str = "http://127.0.0.1:5000"
-) -> None:
-    if "IMAGE" in args and args["IMAGE"]:
-        args["IMAGE"] = [
-            (
-                img
-                if img.startswith(("http://", "https://"))
-                else str(Path(img).absolute())
-            )
-            for img in args["IMAGE"]
-        ]
-
-    if args["OUT_DIR"]:
-        args["OUT_DIR"] = str(Path(args["OUT_DIR"]).absolute())
-
-    log.debug(f"connecting to {address}")
-
-    try:
-        response = requests.post(f"{address}/v1/cli_command", json=args)
-        res_json = json.loads(response.json())
-
-        for record in res_json["result"]["records"]:
-            log.log(LogLevel[record["level"]].value, record["msg"])
-
-    except Exception as e:
-        log.exception(e)
-    finally:
-        log.debug("closing connection")
