@@ -163,7 +163,7 @@ async def run_server() -> None:
 
     app.include_router(v1_router, prefix="/v1")
 
-    config = uvicorn.Config(app, port=5000, host="*")
+    config = uvicorn.Config(app, port=5000, host="localhost")
     server = uvicorn.Server(config)
 
     with Lock(SERVER_PID_FILE), ConfigDirWatchdog(tm):

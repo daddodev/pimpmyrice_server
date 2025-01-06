@@ -27,7 +27,7 @@ setuptools.setup(
     package_data={
         "pimpmyrice_server": ["assets/pimp.ico"],
     },
-    python_requires=">=3.12",
+    python_requires=">=3.10",
     install_requires=[
         "pimpmyrice",
         "fastapi",
