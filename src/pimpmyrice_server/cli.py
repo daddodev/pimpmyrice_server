@@ -10,14 +10,12 @@ Options:
     --verbose -v
 """
 
-import asyncio
 import logging
 import os
 import signal
 import subprocess
 import sys
 from importlib.metadata import version
-from multiprocessing import Process
 
 from docopt import DocoptExit, docopt  # type:ignore
 from pimpmyrice.config import SERVER_PID_FILE
@@ -25,8 +23,8 @@ from pimpmyrice.logger import get_logger
 from pimpmyrice.module_utils import run_shell_command_detached
 from pimpmyrice.utils import is_locked
 
-from .api import run_server
-from .tray import TrayIcon
+from pimpmyrice_server.api import run_server
+from pimpmyrice_server.tray import TrayIcon
 
 log = get_logger(__name__)
 
@@ -44,7 +42,7 @@ async def cli() -> None:
     server_running, server_pid = is_locked(SERVER_PID_FILE)
 
     if args["info"]:
-        log.info(f'🍙 PimpMyRice server {version("pimpmyrice_server")}')
+        log.info(f"🍙 PimpMyRice server {version('pimpmyrice_server')}")
 
     # TODO
     # elif args["attach"]:

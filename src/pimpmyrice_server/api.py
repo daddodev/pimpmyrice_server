@@ -1,21 +1,19 @@
-import asyncio
 import json
 from pathlib import Path
 from typing import Any, AsyncGenerator
 
-import requests
 import uvicorn
 from fastapi import APIRouter, FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.routing import APIRoute
 from pimpmyrice.args import process_args
 from pimpmyrice.config import SERVER_PID_FILE
-from pimpmyrice.logger import LogLevel, get_logger
+from pimpmyrice.logger import get_logger
 from pimpmyrice.theme import ThemeManager
-from pimpmyrice.theme_utils import Theme, ThemeConfig
+from pimpmyrice.theme_utils import Theme
 from pimpmyrice.utils import Lock
 
-from .files import ConfigDirWatchdog
+from pimpmyrice_server.files import ConfigDirWatchdog
 
 log = get_logger(__name__)
 

@@ -5,9 +5,17 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Awaitable
 
-from pimpmyrice.config import (BASE_STYLE_FILE, CONFIG_FILE, LOG_FILE,
-                               MODULES_DIR, PALETTES_DIR, PIMP_CONFIG_DIR,
-                               STYLES_DIR, TEMP_DIR, THEMES_DIR)
+from pimpmyrice.config import (
+    BASE_STYLE_FILE,
+    CONFIG_FILE,
+    LOG_FILE,
+    MODULES_DIR,
+    PALETTES_DIR,
+    PIMP_CONFIG_DIR,
+    STYLES_DIR,
+    TEMP_DIR,
+    THEMES_DIR,
+)
 from pimpmyrice.logger import get_logger
 from pimpmyrice.parsers import parse_theme
 from pimpmyrice.utils import Result
@@ -59,17 +67,21 @@ class ConfigDirWatchdog(FileSystemEventHandler):
                     log.info(f'theme "{theme_name}" deleted')
 
             elif MODULES_DIR in path.parents:
-                if path.suffix == ".j2" or path.name in (
-                    "module.yaml",
-                    "module.json",
-                ):
-
+                if (
+                    path.suffix == ".j2"
+                    or path.name
+                    in (
+                        "module.yaml",
+                        "module.json",
+                    )
+                ) or "templates" in path.parts:
                     if event.event_type == "modified":
                         module_dir = (
                             MODULES_DIR / path.relative_to(MODULES_DIR).parts[0]
                         )
                         log.debug(f"reloading {module_dir.name} for", event)
-                        module = self.tm.mm.load_module(module_dir)
+                        self.tm.mm.load_module(module_dir)
+                        module = self.tm.mm.modules.get(module_dir.name, None)
 
                         if module and module.enabled:
                             self.run_async(

@@ -2,7 +2,7 @@ import asyncio
 
 from pimpmyrice.logger import get_logger
 
-from .cli import cli
+from pimpmyrice_server.cli import cli
 
 log = get_logger(__name__)
 

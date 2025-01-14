@@ -8,7 +8,7 @@ import psutil
 from PIL import Image
 from pystray import Icon, Menu, MenuItem
 
-from . import assets
+from pimpmyrice_server import assets
 
 
 class TrayIcon:
