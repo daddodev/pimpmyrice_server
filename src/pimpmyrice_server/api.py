@@ -1,21 +1,58 @@
+import asyncio
 import json
+import logging
 from pathlib import Path
-from typing import Any, AsyncGenerator
+from typing import Any, AsyncGenerator, Awaitable, Callable
 
 import uvicorn
 from fastapi import APIRouter, FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.routing import APIRoute
 from pimpmyrice.args import process_args
-from pimpmyrice.config import SERVER_PID_FILE
-from pimpmyrice.logger import get_logger
+from pimpmyrice.config_paths import SERVER_PID_FILE
+from pimpmyrice.logger import request_id, serialize_logrecord
 from pimpmyrice.theme import ThemeManager
 from pimpmyrice.theme_utils import Theme
 from pimpmyrice.utils import Lock
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
 
 from pimpmyrice_server.files import ConfigDirWatchdog
 
-log = get_logger(__name__)
+log = logging.getLogger(__name__)
+
+
+class LoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        token = request_id.set(f"request-{id(request)}")
+        try:
+            response = await call_next(request)
+        finally:
+            request_id.reset(token)
+
+        return response
+
+
+class QueueHandler(logging.Handler):
+    def __init__(self, req_id: int, queue: asyncio.Queue[logging.LogRecord]) -> None:
+        super().__init__()
+        self.queue = queue
+        self.request_id = req_id
+
+    def emit(self, record: logging.LogRecord) -> None:
+        if hasattr(record, "request_id") and record.request_id == self.request_id:
+            asyncio.create_task(self.queue.put(record))
+
+
+async def with_end_log(fn: Awaitable[Any]) -> None:
+    try:
+        await fn
+    except Exception as e:
+        log.debug("exception:", exc_info=e)
+        log.error(str(e))
+    log.info("QUEUE_DONE")
 
 
 class ConnectionManager:
@@ -130,28 +167,36 @@ async def run_server() -> None:
     async def cli_command(req: Request) -> StreamingResponse:
         req_json = await req.json()
 
-        result = await process_args(tm, req_json)
+        queue: asyncio.Queue[logging.LogRecord] = asyncio.Queue()
 
-        msg = {
-            "event": "command_executed",
-            "config": vars(tm.config),
-            "result": result.dump(),
-        }
+        log_handler = QueueHandler(request_id.get(), queue)
+        # log_handler.setFormatter(formatter)
+        logging.getLogger().addHandler(log_handler)
+        # TODO remove handler
 
-        # TO DO
-
-        async def content() -> AsyncGenerator[str, None]:
-            for i, record in enumerate(result.records):
-                yield json.dumps({"chunk": i, "data": record.dump()}) + "\n"
-                # await asyncio.sleep(0.1)
+        async def log_generator() -> AsyncGenerator[str, None]:
+            try:
+                while True:
+                    log_record = await queue.get()
+                    if "QUEUE_DONE" in log_record.getMessage():
+                        break
+                    serialized = serialize_logrecord(log_record)
+                    yield serialized
+            except asyncio.CancelledError:
+                # print("canceled")
+                pass
+            finally:
+                logging.getLogger().removeHandler(log_handler)
 
         stream = StreamingResponse(
-            content(),
+            log_generator(),
             status_code=200,
             headers=None,
             media_type=None,
             background=None,
         )
+
+        asyncio.create_task(with_end_log(process_args(tm, req_json)))
 
         return stream
 
@@ -160,6 +205,7 @@ async def run_server() -> None:
         # return json_str
 
     app.include_router(v1_router, prefix="/v1")
+    app.add_middleware(LoggingMiddleware)
 
     config = uvicorn.Config(app, port=5000, host="localhost")
     server = uvicorn.Server(config)

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Awaitable
 
-from pimpmyrice.config import (
+from pimpmyrice.config_paths import (
     BASE_STYLE_FILE,
     CONFIG_FILE,
     LOG_FILE,
@@ -16,16 +17,14 @@ from pimpmyrice.config import (
     TEMP_DIR,
     THEMES_DIR,
 )
-from pimpmyrice.logger import get_logger
 from pimpmyrice.parsers import parse_theme
-from pimpmyrice.utils import Result
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 
 if TYPE_CHECKING:
     from pimpmyrice.theme import ThemeManager
 
-log = get_logger(__name__)
+log = logging.getLogger(__name__)
 
 
 class ConfigDirWatchdog(FileSystemEventHandler):
@@ -96,6 +95,7 @@ class ConfigDirWatchdog(FileSystemEventHandler):
         self.loop.run_until_complete(f)
 
     def __enter__(self) -> None:
+        logging.getLogger("watchdog.observers.inotify_buffer").setLevel(logging.WARNING)
         self.observer.schedule(self, PIMP_CONFIG_DIR, recursive=True)
         self.observer.start()
 

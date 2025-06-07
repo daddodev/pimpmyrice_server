@@ -18,15 +18,13 @@ import sys
 from importlib.metadata import version
 
 from docopt import DocoptExit, docopt  # type:ignore
-from pimpmyrice.config import SERVER_PID_FILE
-from pimpmyrice.logger import get_logger
+from pimpmyrice.config_paths import SERVER_PID_FILE
 from pimpmyrice.module_utils import run_shell_command_detached
 from pimpmyrice.utils import is_locked
 
 from pimpmyrice_server.api import run_server
-from pimpmyrice_server.tray import TrayIcon
 
-log = get_logger(__name__)
+log = logging.getLogger(__name__)
 
 
 async def cli() -> None:
@@ -75,7 +73,15 @@ async def cli() -> None:
             log.info("server started in the background")
 
         else:
-            with TrayIcon():
+            try:
+                from pimpmyrice_server.tray import TrayIcon
+
+                tray_icon = TrayIcon()
+                with tray_icon:
+                    await run_server()
+            except Exception as e:
+                log.debug("exception:", exc_info=e)
+                log.error("error starting tray icon")
                 await run_server()
 
     elif args["stop"]:

@@ -1,10 +1,9 @@
 import asyncio
-
-from pimpmyrice.logger import get_logger
+import logging
 
 from pimpmyrice_server.cli import cli
 
-log = get_logger(__name__)
+log = logging.getLogger(__name__)
 
 
 def main() -> None:
