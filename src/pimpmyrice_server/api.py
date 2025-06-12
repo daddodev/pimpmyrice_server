@@ -6,6 +6,7 @@ from typing import Any, AsyncGenerator, Awaitable, Callable
 
 import uvicorn
 from fastapi import APIRouter, FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.routing import APIRoute
 from pimpmyrice.args import process_args
@@ -62,17 +63,22 @@ class ConnectionManager:
     async def connect(self, websocket: WebSocket) -> None:
         await websocket.accept()
         self.active_connections.append(websocket)
+        print(f"{self.active_connections=}")
 
     def disconnect(self, websocket: WebSocket) -> None:
         self.active_connections.remove(websocket)
+        print(f"{self.active_connections=}")
 
     async def send_personal_message(self, message: str, websocket: WebSocket) -> None:
         await websocket.send_text(message)
+        print(f"{self.active_connections=}")
 
     async def broadcast(self, message: str | dict[str, Any]) -> None:
+        print(f"{self.active_connections=}")
         if isinstance(message, dict):
             message = json.dumps(message)
         for connection in self.active_connections:
+            print(f"{message}")
             await connection.send_text(message)
 
 
@@ -124,15 +130,11 @@ async def run_server() -> None:
     @v1_router.put("/current_theme")
     async def set_theme(name: str | None = None, random: str | None = None) -> str:
         if random is None:
-            res = await tm.apply_theme(theme_name=name)
+            await tm.apply_theme(theme_name=name)
         else:
-            res = await tm.set_random_theme(name_includes=name)
+            await tm.set_random_theme(name_includes=name)
 
-        msg = {
-            "event": "theme_applied",
-            "config": vars(tm.config),
-            "result": res.dump(),
-        }
+        msg = {"event": "theme_applied", "config": vars(tm.config)}
 
         json_str = json.dumps(msg)
 
@@ -206,6 +208,15 @@ async def run_server() -> None:
 
     app.include_router(v1_router, prefix="/v1")
     app.add_middleware(LoggingMiddleware)
+
+    # Allow all origins (not secure for production!)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],  # <--- allow any origin
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     config = uvicorn.Config(app, port=5000, host="localhost")
     server = uvicorn.Server(config)

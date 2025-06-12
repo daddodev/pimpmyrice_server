@@ -28,6 +28,8 @@
         #   pkgs.mkShell { packages = [ pythonEnv ]; };
         pkgs.mkShell {
           buildInputs = with pkgs.python3Packages; [
+            pkgs.entr
+
             pkgs.python3
             pip
             build
