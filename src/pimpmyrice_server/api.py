@@ -13,7 +13,7 @@ from pimpmyrice.args import process_args
 from pimpmyrice.config_paths import SERVER_PID_FILE
 from pimpmyrice.logger import request_id, serialize_logrecord
 from pimpmyrice.theme import ThemeManager
-from pimpmyrice.theme_utils import Theme
+from pimpmyrice.theme_utils import Theme, ThemeConfig
 from pimpmyrice.utils import Lock
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
@@ -113,6 +113,10 @@ async def run_server() -> None:
                 data = await websocket.receive_text()
                 print(data)
         except WebSocketDisconnect:
+            pass  # Normal disconnect
+        except Exception as e:
+            log.error(f"Unexpected WebSocket error: {e}", exc_info=True)
+        finally:
             manager.disconnect(websocket)
 
     @v1_router.get("/tags")
@@ -121,18 +125,22 @@ async def run_server() -> None:
         return tags
 
     @v1_router.get("/current_theme")
-    async def get_current_theme() -> Theme | None:
+    async def get_current_theme() -> Theme:
         if not tm.config.theme:
             return None
         theme = tm.themes[tm.config.theme]
         return theme
 
+    @v1_router.get("/config")
+    async def get_config() -> ThemeConfig:
+        return tm.config
+
     @v1_router.put("/current_theme")
-    async def set_theme(name: str | None = None, random: str | None = None) -> str:
+    async def set_theme(name: str | None = None, random: str | None = None, mode: str | None = None) -> str:
         if random is None:
-            await tm.apply_theme(theme_name=name)
+            await tm.apply_theme(theme_name=name, mode_name=mode)
         else:
-            await tm.set_random_theme(name_includes=name)
+            await tm.set_random_theme(name_includes=name, mode_name=mode)
 
         msg = {"event": "theme_applied", "config": vars(tm.config)}
 
@@ -202,17 +210,69 @@ async def run_server() -> None:
 
         return stream
 
-        # json_str = json.dumps(msg)
+    @v1_router.get("/modules")
+    async def get_modules() -> dict[str, Any]:
+        """Get all modules and their states"""
+        return {name: module.model_dump() for name, module in tm.mm.modules.items()}
 
-        # return json_str
+    @v1_router.post("/modules/clone")
+    async def clone_module(source: str | list[str]) -> dict[str, Any]:
+        """Clone a module from a source (git URL, local path, or pimp:// URL)"""
+        await tm.mm.clone_module(source)
+        return {"status": "success", "message": f"Module(s) cloned successfully"}
+
+    @v1_router.post("/modules/create")
+    async def create_module(module_name: str) -> dict[str, Any]:
+        """Create a new module with the given name"""
+        await tm.mm.create_module(module_name)
+        return {"status": "success", "message": f"Module {module_name} created successfully"}
+
+    @v1_router.delete("/modules/{module_name}")
+    async def delete_module(module_name: str) -> dict[str, Any]:
+        """Delete a module by name"""
+        await tm.mm.delete_module(module_name)
+        return {"status": "success", "message": f"Module {module_name} deleted successfully"}
+
+    @v1_router.post("/modules/{module_name}/init")
+    async def init_module(module_name: str) -> dict[str, Any]:
+        """Initialize a module by name"""
+        await tm.mm.init_module(module_name)
+        return {"status": "success", "message": f"Module {module_name} initialized successfully"}
+
+    @v1_router.post("/modules/{module_name}/command/{command_name}")
+    async def run_module_command(
+        module_name: str,
+        command_name: str,
+        request: Request
+    ) -> dict[str, Any]:
+        """Run a specific command on a module"""
+        cmd_args = await request.json()
+        await tm.mm.run_module_command(
+            tm,
+            module_name=module_name,
+            command=command_name,
+            **cmd_args
+        )
+        return {
+            "status": "success",
+            "message": f"Command {command_name} executed on module {module_name} successfully"
+        }
+
+    @v1_router.post("/modules/rewrite")
+    async def rewrite_modules(name_includes: str | None = None) -> dict[str, Any]:
+        """Rewrite module configuration files"""
+        await tm.mm.rewrite_modules(name_includes)
+        return {
+            "status": "success",
+            "message": "Modules rewritten successfully"
+        }
 
     app.include_router(v1_router, prefix="/v1")
     app.add_middleware(LoggingMiddleware)
 
-    # Allow all origins (not secure for production!)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # <--- allow any origin
+        allow_origins=["*"],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

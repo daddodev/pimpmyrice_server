@@ -19,7 +19,7 @@ from importlib.metadata import version
 
 from docopt import DocoptExit, docopt  # type:ignore
 from pimpmyrice.config_paths import SERVER_PID_FILE
-from pimpmyrice.module_utils import run_shell_command_detached
+from pimpmyrice.module_utils import run_shell_command_detached, run_shell_command
 from pimpmyrice.utils import is_locked
 
 from pimpmyrice_server.api import run_server
@@ -52,17 +52,14 @@ async def cli() -> None:
         elif args["--daemon"]:
             log.debug("starting server daemon")
 
-            run_shell_command_detached(f"pimp-server start {' '.join(sys.argv)}")
+            sys.argv.remove("--daemon")
 
             if sys.platform == "win32":
-                # Relaunch using CREATE_NEW_PROCESS_GROUP to fully detach
                 subprocess.Popen(
                     [sys.executable] + sys.argv,
                     creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
                 )
             else:
-                # On Unix-like systems, fork and detach
-                sys.argv.remove("--daemon")
                 subprocess.Popen(
                     [sys.executable] + sys.argv,
                     stdout=subprocess.DEVNULL,
@@ -71,7 +68,6 @@ async def cli() -> None:
                 )
 
             log.info("server started in the background")
-
         else:
             try:
                 from pimpmyrice_server.tray import TrayIcon
