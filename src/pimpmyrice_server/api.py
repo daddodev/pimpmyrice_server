@@ -172,6 +172,12 @@ async def run_server() -> None:
     async def get_base_style(request: Request) -> dict[str, Any]:
         keywords = tm.base_style
         return keywords
+    
+    @v1_router.put("/base_style")
+    async def set_base_style(request: Request, keywords: dict[str, Any]) -> dict[str, Any]:
+        await tm.save_base_style(keywords)
+        await tm.apply_theme()
+        return {"status": "success", "message": "Base style updated successfully"}
 
     @v1_router.post("/cli_command")
     async def cli_command(req: Request) -> StreamingResponse:

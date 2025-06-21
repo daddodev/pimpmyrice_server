@@ -11,8 +11,6 @@ import psutil
 from PIL import Image
 from pystray import Icon, Menu, MenuItem
 
-from pimpmyrice_server import assets
-
 
 GUI_CMD = "pimp-tauri"
 path_to_executable = shutil.which(GUI_CMD)
@@ -32,6 +30,7 @@ class TrayIcon:
     def __exit__(self, *_: Any) -> None:
         self.icon.stop()
 
+
 def open_gui() -> None:
     if path_to_executable is None:
         log.error(f'Error: "{GUI_CMD}" not found in PATH')
@@ -40,18 +39,21 @@ def open_gui() -> None:
         log.debug(f'using "{path_to_executable}"')
     subprocess.Popen([path_to_executable])
 
-def _get_pystray_icon() -> Icon: # type: ignore
+
+def _get_pystray_icon() -> Icon:  # type: ignore
     def stop_server() -> None:
         os.kill(os.getpid(), signal.SIGTERM)
 
     items = [
-        MenuItem("Open GUI", open_gui, default=True, enabled=path_to_executable is not None),
+        MenuItem(
+            "Open GUI", open_gui, default=True, enabled=path_to_executable is not None
+        ),
         MenuItem("stop server", stop_server),
     ]
 
     menu = Menu(*items)
 
-    if getattr(sys, 'frozen', False):
+    if getattr(sys, "frozen", False):
         base_path = Path(sys._MEIPASS) / "assets"
     else:
         base_path = Path(__file__).parent / "assets"
@@ -63,6 +65,6 @@ def _get_pystray_icon() -> Icon: # type: ignore
         title="PimpMyRice server",
         icon=Image.open(icon_path),
         menu=menu,
-
     )
     return icon
+
