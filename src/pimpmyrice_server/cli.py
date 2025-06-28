@@ -2,12 +2,13 @@
 See https://pimpmyrice.vercel.app/docs for more info.
 
 Usage:
-    pimp-server start [--daemon] [options]
+    pimp-server [--daemon] [--host <host>] [options]
     pimp-server stop [options]
     pimp-server info [options]
 
 Options:
     --verbose -v
+    --host <host>   Host to bind the server to [default: localhost]
 """
 
 import logging
@@ -45,15 +46,21 @@ async def cli() -> None:
     # TODO
     # elif args["attach"]:
 
-    elif args["start"]:
+    elif args["stop"]:
+        if server_running:
+            os.kill(server_pid, signal.SIGTERM)
+            log.info("server stopped")
+        else:
+            log.error("server not running")
+
+    else:
+        # Default: start server
+        host = args["--host"] or "localhost"
         if server_running:
             log.error("server already running")
-
         elif args["--daemon"]:
             log.debug("starting server daemon")
-
             sys.argv.remove("--daemon")
-
             if sys.platform == "win32":
                 subprocess.Popen(
                     [sys.executable] + sys.argv,
@@ -66,23 +73,14 @@ async def cli() -> None:
                     stderr=subprocess.DEVNULL,
                     preexec_fn=os.setpgrp,
                 )
-
             log.info("server started in the background")
         else:
             try:
                 from pimpmyrice_server.tray import TrayIcon
-
                 tray_icon = TrayIcon()
                 with tray_icon:
-                    await run_server()
+                    await run_server(host=host)
             except Exception as e:
                 log.debug("exception:", exc_info=e)
                 log.error("error starting tray icon")
-                await run_server()
-
-    elif args["stop"]:
-        if server_running:
-            os.kill(server_pid, signal.SIGTERM)
-            log.info("server stopped")
-        else:
-            log.error("server not running")
+                await run_server(host=host)

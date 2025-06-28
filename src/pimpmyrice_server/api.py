@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, AsyncGenerator, Awaitable, Callable
 
 import uvicorn
-from fastapi import APIRouter, FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, FastAPI, Request, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.routing import APIRoute
@@ -86,7 +86,7 @@ def custom_generate_unique_id(route: APIRoute) -> str:
     return f"{route.name}"
 
 
-async def run_server() -> None:
+async def run_server(host: str = "localhost") -> None:
     tm = ThemeManager()
     app = FastAPI(generate_unique_id_function=custom_generate_unique_id)
     manager = ConnectionManager()
@@ -94,12 +94,19 @@ async def run_server() -> None:
 
     async def broadcast_config() -> None:
         await manager.broadcast(
-            json.dumps({"type": "config_changed", "config": vars(tm.config)})
+            json.dumps({"type": "theme_applied", "config": vars(tm.config)})
         )
+
+    async def broadcast_themes_changed() -> None:
+        await manager.broadcast(json.dumps({"type": "themes_changed"}))
 
     tm.event_handler.subscribe(
         "theme_applied",
         broadcast_config,
+    )
+    tm.event_handler.subscribe(
+        "themes_changed",
+        broadcast_themes_changed,
     )
 
     @v1_router.websocket("/ws/{client_id}")
@@ -136,7 +143,9 @@ async def run_server() -> None:
         return tm.config
 
     @v1_router.put("/current_theme")
-    async def set_theme(name: str | None = None, random: str | None = None, mode: str | None = None) -> str:
+    async def set_theme(
+        name: str | None = None, random: str | None = None, mode: str | None = None
+    ) -> str:
         if random is None:
             await tm.apply_theme(theme_name=name, mode_name=mode)
         else:
@@ -153,11 +162,47 @@ async def run_server() -> None:
         theme = tm.themes[name]
         return theme
 
+    @v1_router.put("/theme/{name}")
+    async def update_theme(request: Request, name: str, theme_data: dict[str, Any]) -> dict[str, Any]:
+        if name not in tm.themes:
+            raise HTTPException(status_code=404, detail=f"Theme '{name}' not found")
+        
+        # Get the current theme
+        current_theme = tm.themes[name]
+        
+        # Update the theme with new data
+        if "name" in theme_data:
+            current_theme.name = theme_data["name"]
+        if "tags" in theme_data:
+            current_theme.tags = theme_data["tags"]
+        if "style" in theme_data:
+            current_theme.style = theme_data["style"]
+        
+        # Save the updated theme
+        await tm.save_theme(current_theme, old_name=name)
+        
+        return {"status": "success", "message": f"Theme '{name}' updated successfully"}
+
+    @v1_router.delete("/theme/{name}")
+    async def delete_theme(request: Request, name: str) -> None:
+        print("nnnn: ", name)
+        await tm.delete_theme(name)
+
     @v1_router.get("/themes")
     async def get_themes(request: Request) -> dict[str, Theme]:
         themes = tm.themes
 
         return themes
+
+    @v1_router.post("/themes")
+    async def gen_theme(
+        request: Request, image_path: str, apply: bool = False
+    ) -> dict[str, Any]:
+        await tm.generate_theme(image_path, apply=apply)
+
+        msg = {"event": "theme_generated", "config": vars(tm.config)}
+
+        return msg
 
     @v1_router.get("/image")
     async def get_image(request: Request, path: str) -> FileResponse:
@@ -172,9 +217,11 @@ async def run_server() -> None:
     async def get_base_style(request: Request) -> dict[str, Any]:
         keywords = tm.base_style
         return keywords
-    
+
     @v1_router.put("/base_style")
-    async def set_base_style(request: Request, keywords: dict[str, Any]) -> dict[str, Any]:
+    async def set_base_style(
+        request: Request, keywords: dict[str, Any]
+    ) -> dict[str, Any]:
         await tm.save_base_style(keywords)
         await tm.apply_theme()
         return {"status": "success", "message": "Base style updated successfully"}
@@ -231,47 +278,48 @@ async def run_server() -> None:
     async def create_module(module_name: str) -> dict[str, Any]:
         """Create a new module with the given name"""
         await tm.mm.create_module(module_name)
-        return {"status": "success", "message": f"Module {module_name} created successfully"}
+        return {
+            "status": "success",
+            "message": f"Module {module_name} created successfully",
+        }
 
     @v1_router.delete("/modules/{module_name}")
     async def delete_module(module_name: str) -> dict[str, Any]:
         """Delete a module by name"""
         await tm.mm.delete_module(module_name)
-        return {"status": "success", "message": f"Module {module_name} deleted successfully"}
+        return {
+            "status": "success",
+            "message": f"Module {module_name} deleted successfully",
+        }
 
     @v1_router.post("/modules/{module_name}/init")
     async def init_module(module_name: str) -> dict[str, Any]:
         """Initialize a module by name"""
         await tm.mm.init_module(module_name)
-        return {"status": "success", "message": f"Module {module_name} initialized successfully"}
+        return {
+            "status": "success",
+            "message": f"Module {module_name} initialized successfully",
+        }
 
     @v1_router.post("/modules/{module_name}/command/{command_name}")
     async def run_module_command(
-        module_name: str,
-        command_name: str,
-        request: Request
+        module_name: str, command_name: str, request: Request
     ) -> dict[str, Any]:
         """Run a specific command on a module"""
         cmd_args = await request.json()
         await tm.mm.run_module_command(
-            tm,
-            module_name=module_name,
-            command=command_name,
-            **cmd_args
+            tm, module_name=module_name, command=command_name, **cmd_args
         )
         return {
             "status": "success",
-            "message": f"Command {command_name} executed on module {module_name} successfully"
+            "message": f"Command {command_name} executed on module {module_name} successfully",
         }
 
     @v1_router.post("/modules/rewrite")
     async def rewrite_modules(name_includes: str | None = None) -> dict[str, Any]:
         """Rewrite module configuration files"""
         await tm.mm.rewrite_modules(name_includes)
-        return {
-            "status": "success",
-            "message": "Modules rewritten successfully"
-        }
+        return {"status": "success", "message": "Modules rewritten successfully"}
 
     app.include_router(v1_router, prefix="/v1")
     app.add_middleware(LoggingMiddleware)
@@ -284,7 +332,7 @@ async def run_server() -> None:
         allow_headers=["*"],
     )
 
-    config = uvicorn.Config(app, port=5000, host="localhost")
+    config = uvicorn.Config(app, port=5000, host=host)
     server = uvicorn.Server(config)
 
     with Lock(SERVER_PID_FILE), ConfigDirWatchdog(tm):
