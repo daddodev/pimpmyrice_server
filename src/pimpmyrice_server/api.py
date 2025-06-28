@@ -5,7 +5,14 @@ from pathlib import Path
 from typing import Any, AsyncGenerator, Awaitable, Callable
 
 import uvicorn
-from fastapi import APIRouter, FastAPI, Request, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import (
+    APIRouter,
+    FastAPI,
+    HTTPException,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.routing import APIRoute
@@ -163,13 +170,17 @@ async def run_server(host: str = "localhost") -> None:
         return theme
 
     @v1_router.put("/theme/{name}")
-    async def update_theme(request: Request, name: str, theme_data: dict[str, Any]) -> dict[str, Any]:
+    async def update_theme(
+        request: Request, name: str, theme_data: dict[str, Any]
+    ) -> dict[str, Any]:
         if name not in tm.themes:
             raise HTTPException(status_code=404, detail=f"Theme '{name}' not found")
-        
+
+        # TODO refactor
+
         # Get the current theme
         current_theme = tm.themes[name]
-        
+
         # Update the theme with new data
         if "name" in theme_data:
             current_theme.name = theme_data["name"]
@@ -177,10 +188,14 @@ async def run_server(host: str = "localhost") -> None:
             current_theme.tags = theme_data["tags"]
         if "style" in theme_data:
             current_theme.style = theme_data["style"]
-        
+
         # Save the updated theme
         await tm.save_theme(current_theme, old_name=name)
-        
+
+        if tm.config.theme == name:
+            log.info("reloading current theme")
+            await tm.apply_theme()
+
         return {"status": "success", "message": f"Theme '{name}' updated successfully"}
 
     @v1_router.delete("/theme/{name}")
